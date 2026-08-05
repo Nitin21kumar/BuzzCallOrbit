@@ -1,0 +1,62 @@
+# Render Blueprint - deploys both services together.
+# In the Render Dashboard: New -> Blueprint -> select this repo.
+# Render will ask you to fill in every "sync: false" value below during setup.
+# See README.md "Deploying to Render" section for the full walkthrough.
+
+services:
+  # ---------------------------------------------------------------- backend --
+  - type: web
+    name: obd-backend
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB
+        value: obd_suite
+      - key: SARV_USER_ID
+        sync: false
+      - key: SARV_USER_TOKEN
+        sync: false
+      - key: SARV_PLAN_ID
+        sync: false
+      - key: SARV_PLAN_TYPE
+        value: C
+      - key: SARV_INCLUDES_COUNTRY_CODE
+        value: N
+      - key: SARV_WEBHOOK_SECRET
+        generateValue: true
+      # Leave PUBLIC_BASE_URL unset on Render - the backend auto-detects its
+      # own public URL from Render's built-in RENDER_EXTERNAL_URL variable.
+      # Only fill this in manually for ngrok/local use.
+      - key: PUBLIC_BASE_URL
+        value: ""
+      # After the frontend service is deployed, come back and set this to
+      # its full URL, e.g. https://obd-frontend-xhzq.onrender.com
+      # (comma-separate multiple origins if needed)
+      - key: ALLOWED_ORIGINS
+        sync: false
+
+  # --------------------------------------------------------------- frontend --
+  - type: web
+    name: obd-frontend
+    runtime: docker
+    rootDir: frontend
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    envVars:
+      # Must be the backend service's full public URL, e.g.
+      # https://obd-backend-xxxx.onrender.com (no trailing slash).
+      # Vite bakes this into the JS bundle at BUILD time, so if you change
+      # it later you must trigger a new deploy/build for it to take effect.
+      - key: VITE_API_BASE_URL
+        sync: false
