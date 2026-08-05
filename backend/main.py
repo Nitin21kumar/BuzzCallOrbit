@@ -9,7 +9,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import check_connection
 from app.routers import speech, stt, campaigns
 
-app = FastAPI(title="OBD Suite API", version="1.0.0")
+app = FastAPI(
+    title="OBD Suite API",
+    version="1.0.0",
+    # Render sets RENDER=true automatically for every service. Hide the
+    # interactive API docs/schema in production so nobody browsing to
+    # /docs, /redoc, or /openapi.json can see your route structure -
+    # they still work locally for development.
+    docs_url=None if os.getenv("RENDER") else "/docs",
+    redoc_url=None if os.getenv("RENDER") else "/redoc",
+    openapi_url=None if os.getenv("RENDER") else "/openapi.json",
+)
 
 # Comma-separated list of allowed frontend origins, e.g.
 # "https://obd-frontend-xhzq.onrender.com,http://localhost:5173"
@@ -28,13 +38,6 @@ app.add_middleware(
 app.include_router(speech.router)
 app.include_router(stt.router)
 app.include_router(campaigns.router)
-
-
-@app.get("/")
-def root():
-    # Kept intentionally minimal - this backend has no UI of its own, this
-    # just avoids a confusing 404 if someone opens the bare backend URL.
-    return {"service": "OBD Suite API", "status": "running", "docs": "/docs"}
 
 
 @app.get("/health")
