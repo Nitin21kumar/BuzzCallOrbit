@@ -629,12 +629,12 @@ async def sarv_status_webhook(request: Request):
 
     unique_id = payload.get("uniqueId") or payload.get("unique_id")
     status = payload.get("status")
-    duration = payload.get("duration") or payload.get("call_duration")
+    duration = payload.get("duration") or payload.get("call_duration") or payload.get("answer_duration")
 
     if not unique_id:
         return {"ok": False, "reason": "no uniqueId in payload - check server logs for the raw body"}
 
-    new_status = sarv_client.map_sarv_status(status) if status else "completed"
+    new_status = sarv_client.map_callback_status(status)
     update = {"status": new_status}
     if duration:
         try:
