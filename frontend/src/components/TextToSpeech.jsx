@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Sparkles, Download, CheckCircle2, XCircle, History, CheckSquare, Square, Trash2, FolderPlus, Folder, Loader2 } from 'lucide-react'
 import { LANGUAGES } from '../languages'
 import * as api from '../api'
+import PermissionNotice from './PermissionNotice.jsx'
 
 // Sarvam's own docs call this the single most impactful tuning lever for how
 // natural vs robotic the voice sounds. Higher temperature = more natural
@@ -27,17 +28,28 @@ export default function TextToSpeech() {
   const [generating, setGenerating] = useState(false)
   const [results, setResults] = useState([])
   const [history, setHistory] = useState([])
+  const [noViewAccess, setNoViewAccess] = useState(false)
 
   const loadFolders = async () => {
-    const res = await api.listVoiceFolders()
-    setFolders(res.data)
-    return res.data
+    try {
+      const res = await api.listVoiceFolders()
+      setFolders(res.data)
+      return res.data
+    } catch (error) {
+      if (error?.response?.status === 403) { setNoViewAccess(true); return [] }
+      throw error
+    }
   }
 
   const loadHistory = async (forFolderId) => {
     if (!forFolderId) return setHistory([])
-    const res = await api.getTtsHistory(forFolderId)
-    setHistory(res.data)
+    try {
+      const res = await api.getTtsHistory(forFolderId)
+      setHistory(res.data)
+    } catch (error) {
+      if (error?.response?.status === 403) { setNoViewAccess(true); return }
+      throw error
+    }
   }
 
   useEffect(() => { loadFolders() }, [])
@@ -267,7 +279,8 @@ export default function TextToSpeech() {
           </div>
           <p style={styles.librarySub}>Only this folder's voices are shown here. Regenerating a language overwrites its saved file.</p>
           <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 460, overflowY: 'auto' }}>
-            {history.length === 0 && <p style={{ color: 'var(--text-secondary)', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>{folderId ? 'No audio generated yet in this folder.' : 'Select a folder to see its voices.'}</p>}
+            {noViewAccess && <PermissionNotice label="voice history" />}
+            {!noViewAccess && history.length === 0 && <p style={{ color: 'var(--text-secondary)', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>{folderId ? 'No audio generated yet in this folder.' : 'Select a folder to see its voices.'}</p>}
             {history.map((item) => (
               <div key={item._id} style={styles.historyRow}>
                 <div>
@@ -329,7 +342,7 @@ const styles = {
   generateBtn: {
     width: '100%', marginTop: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
     padding: '13px 16px', borderRadius: 12, border: 'none', fontSize: 14, fontWeight: 700, color: '#fff',
-    background: 'linear-gradient(135deg, var(--accent-purple), var(--accent-blue))',
+    background: 'linear-gradient(135deg, var(--accent-purple), var(--warning))',
   },
   spinIcon: { animation: 'spin 1s linear infinite' },
   resultRow: {

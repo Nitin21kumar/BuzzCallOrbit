@@ -3,6 +3,7 @@ import { Home, Phone, PhoneCall, PhoneOff, Satellite, RefreshCw, PlusCircle } fr
 import { ComposedChart, Bar, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import StatCard from './StatCard'
 import AudioPlayerWidget from './AudioPlayerWidget.jsx'
+import WelcomeModal from './WelcomeModal.jsx'
 import * as api from '../api'
 
 function CustomTooltip({ active, payload, label }) {
@@ -29,21 +30,42 @@ function CustomTooltip({ active, payload, label }) {
   )
 }
 
-export default function Dashboard({ onCreateCampaign, onOpenCampaigns, searchQuery }) {
+export default function Dashboard({ user, onCreateCampaign, onOpenCampaigns, searchQuery }) {
   const [overview, setOverview] = useState(null)
   const [campaigns, setCampaigns] = useState([])
   const [dailyStats, setDailyStats] = useState([])
   const [topCampaigns, setTopCampaigns] = useState([])
   const [refreshing, setRefreshing] = useState(false)
+  const [noViewAccess, setNoViewAccess] = useState(false)
+
+  const displayName = user?.displayName?.trim() || (user?.email ? user.email.split('@')[0] : 'there')
+
+  // Shown once per browser session, right when the dashboard first loads after
+  // sign-in — not every time the user switches back to this tab.
+  const [showWelcome, setShowWelcome] = useState(
+    () => typeof window !== 'undefined' && window.sessionStorage.getItem('obd-welcome-shown') !== 'true'
+  )
+  const dismissWelcome = () => {
+    setShowWelcome(false)
+    window.sessionStorage.setItem('obd-welcome-shown', 'true')
+  }
 
   const load = async () => {
-    const [overviewRes, campaignsRes, dailyRes, perfRes] = await Promise.all([
-      api.getObdOverview(), api.listCampaigns(), api.getDailyStats(), api.getCampaignPerformance(),
-    ])
-    setOverview(overviewRes.data)
-    setCampaigns(campaignsRes.data)
-    setDailyStats(dailyRes.data)
-    setTopCampaigns(perfRes.data)
+    try {
+      const [overviewRes, campaignsRes, dailyRes, perfRes] = await Promise.all([
+        api.getObdOverview(), api.listCampaigns(), api.getDailyStats(), api.getCampaignPerformance(),
+      ])
+      setOverview(overviewRes.data)
+      setCampaigns(campaignsRes.data)
+      setDailyStats(dailyRes.data)
+      setTopCampaigns(perfRes.data)
+    } catch (error) {
+      if (error?.response?.status === 403) {
+        setNoViewAccess(true)
+      } else {
+        throw error
+      }
+    }
   }
 
   useEffect(() => { load() }, [])
@@ -78,10 +100,16 @@ export default function Dashboard({ onCreateCampaign, onOpenCampaigns, searchQue
 
   return (
     <div className="dash-page">
+      {showWelcome && <WelcomeModal name={displayName} onClose={dismissWelcome} />}
+
       <div className="dash-header-row">
         <div>
-          <h1 className="dash-title">Welcome back, Admin! 👋</h1>
-          <p className="dash-sub">Here's what's happening with your calling campaigns today.</p>
+          <h1 className="dash-title">Welcome back, {displayName} 👋</h1>
+          <p className="dash-sub">
+            {noViewAccess
+              ? "You don't have permission to view dashboard data yet. Ask your admin for access."
+              : "Here's what's happening with your calling campaigns today."}
+          </p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button className="dash-btn dash-btn--ghost" onClick={handleRefresh} disabled={refreshing}>

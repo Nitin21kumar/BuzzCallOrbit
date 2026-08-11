@@ -18,6 +18,7 @@ seconds, no card) from https://console.groq.com/keys
 Uses the OpenAI-compatible REST endpoint, so no extra SDK dependency needed.
 """
 
+import json
 import os
 
 import httpx
@@ -127,3 +128,58 @@ async def correct_transcript(transcript: str, language_name: str) -> str:
     )
     prompt = f"Raw transcript:\n{transcript.strip()}"
     return await _call_groq(prompt, system_instruction)
+
+
+async def whatsapp_smart_reply(
+    incoming_message: str,
+    conversation_history: list[dict],
+    campaign_context: str = "",
+    knowledge_base: str = "",
+) -> dict:
+    """Generates a WhatsApp reply, aware of the recent conversation, an
+    optional business knowledge base (FAQ/policies), and decides whether
+    this needs a human. `conversation_history` is a list of
+    {"direction": "in"|"out", "text": ...} in chronological order (most
+    recent last). Returns {"reply": str, "buttons": list[str] (0-3, each
+    <=20 chars), "needs_human": bool}."""
+    history_lines = []
+    for msg in conversation_history[-10:]:
+        speaker = "Customer" if msg.get("direction") == "in" else "Business"
+        history_lines.append(f"{speaker}: {msg.get('text', '')}")
+    history_text = "\n".join(history_lines) if history_lines else "(no prior messages)"
+
+    system_instruction = (
+        "You are a helpful, concise WhatsApp business assistant replying on behalf of a company. "
+        "Keep replies short (1-4 sentences), natural, and in the same language/script the customer "
+        "is writing in (match Hindi/Hinglish/English/etc. to what they used). Never invent facts, "
+        "prices, order numbers, or policies you don't have.\n\n"
+        "Respond with ONLY a raw JSON object (no markdown fences, no extra text) with exactly these keys:\n"
+        '- "reply": your reply text as a plain string\n'
+        '- "buttons": an array of 0 to 3 short button labels (each under 20 characters), ONLY when you are '
+        "genuinely offering the customer a clear multiple-choice next step (e.g. [\"Track Order\", \"Talk to Agent\"]) "
+        "- use an empty array otherwise, do not force buttons into every reply\n"
+        '- "needs_human": true if the customer sounds angry/frustrated, explicitly asks for a human or agent, '
+        "or asks something genuinely outside what you know from the context/knowledge base below - false otherwise"
+        + (f"\n\nBusiness/campaign context: {campaign_context}" if campaign_context else "")
+        + (f"\n\nBusiness knowledge base — answer questions using ONLY this info, do not invent beyond it:\n{knowledge_base}" if knowledge_base else "")
+    )
+    prompt = f"Conversation so far:\n{history_text}\n\nCustomer's new message: {incoming_message}"
+    raw = await _call_groq(prompt, system_instruction)
+
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.strip("`")
+        if cleaned.lower().startswith("json"):
+            cleaned = cleaned[4:]
+        cleaned = cleaned.strip()
+
+    try:
+        parsed = json.loads(cleaned)
+        return {
+            "reply": str(parsed.get("reply", "")).strip() or "Sorry, I'm not sure — let me get someone to help you.",
+            "buttons": [str(b)[:20] for b in (parsed.get("buttons") or [])][:3],
+            "needs_human": bool(parsed.get("needs_human", False)),
+        }
+    except (json.JSONDecodeError, TypeError):
+        # Groq didn't return valid JSON - fall back to using the raw text as the reply
+        return {"reply": raw.strip(), "buttons": [], "needs_human": False}

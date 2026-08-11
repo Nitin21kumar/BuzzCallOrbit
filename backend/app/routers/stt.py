@@ -2,9 +2,10 @@ import os
 from datetime import datetime
 
 import httpx
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 
 from .. import groq_client
+from ..auth import require_permission, owner_filter
 from ..constants import LANGUAGE_DISPLAY
 from ..database import stt_collection
 
@@ -16,6 +17,7 @@ async def transcribe_audio(
     file: UploadFile = File(...),
     language_code: str = Form("unknown"),
     translate_to_english: bool = Form(False),
+    user: dict = Depends(require_permission("stt", "transcribe")),
 ):
     """Transcribes an uploaded audio file using Sarvam AI (Saaras v3).
     If translate_to_english is True, uses Saaras v3's mode="translate" so the
@@ -79,6 +81,7 @@ async def transcribe_audio(
         "language_code": output_language_code,
         "spoken_language_code": detected_language,
         "created_at": datetime.utcnow(),
+        "created_by": user["uid"],
     })
 
     return {
@@ -90,8 +93,9 @@ async def transcribe_audio(
 
 
 @router.get("/history")
-def stt_history():
-    docs = list(stt_collection.find().sort("created_at", -1).limit(50))
+def stt_history(user: dict = Depends(require_permission("stt", "view"))):
+    """A plain user only sees their own transcriptions; admin/super_admin see everyone's."""
+    docs = list(stt_collection.find(owner_filter(user)).sort("created_at", -1).limit(50))
     for doc in docs:
         doc["_id"] = str(doc["_id"])
     return docs

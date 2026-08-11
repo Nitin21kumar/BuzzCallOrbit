@@ -4,10 +4,11 @@ from datetime import datetime
 import httpx
 from bson import ObjectId, Binary
 from bson.errors import InvalidId
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
 from .. import groq_client
+from ..auth import require_any_permission, require_permission, owner_filter, assert_owns_or_admin
 from ..constants import LANGUAGE_DISPLAY, LANGUAGE_NAMES, resolve_speaker
 from ..database import tts_collection, voice_folders_collection
 
@@ -19,6 +20,13 @@ def _oid(folder_id: str) -> ObjectId:
         return ObjectId(folder_id)
     except InvalidId:
         raise HTTPException(400, "Invalid folder id")
+
+
+def _folder_or_404(folder_id: str) -> dict:
+    folder = voice_folders_collection.find_one({"_id": _oid(folder_id)})
+    if not folder:
+        raise HTTPException(404, "Folder not found")
+    return folder
 
 
 # ---------------------------------------------------------------- schemas --
@@ -41,17 +49,17 @@ class GenerateRequest(BaseModel):
 # ------------------------------------------------------------ voice folders --
 
 @router.post("/folders")
-def create_folder(payload: FolderCreate):
+def create_folder(payload: FolderCreate, user: dict = Depends(require_permission("voices", "create"))):
     """Creates a brand-new, named voice folder. A folder name is required
     every time - this is the mandatory first step before generating speech."""
-    doc = {"name": payload.name.strip(), "created_at": datetime.utcnow()}
+    doc = {"name": payload.name.strip(), "created_at": datetime.utcnow(), "created_by": user["uid"]}
     result = voice_folders_collection.insert_one(doc)
     return {"id": str(result.inserted_id), "name": doc["name"], "created_at": doc["created_at"]}
 
 
 @router.get("/folders")
-def list_folders():
-    docs = voice_folders_collection.find().sort("created_at", -1)
+def list_folders(user: dict = Depends(require_any_permission(("tts", "view"), ("voices", "view")))):
+    docs = voice_folders_collection.find(owner_filter(user)).sort("created_at", -1)
     folders = []
     for d in docs:
         folder_id = str(d["_id"])
@@ -61,7 +69,7 @@ def list_folders():
 
 
 @router.delete("/folders/{folder_id}")
-def delete_folder(folder_id: str):
+def delete_folder(folder_id: str, user: dict = Depends(require_permission("voices", "delete"))):
     """Deletes a voice folder entirely: its DB record and every generated
     language's DB record (audio included, since audio is stored as binary
     data inside those same MongoDB documents - no files on disk to clean up)."""
@@ -69,6 +77,7 @@ def delete_folder(folder_id: str):
     folder = voice_folders_collection.find_one({"_id": oid})
     if not folder:
         raise HTTPException(404, "Folder not found")
+    assert_owns_or_admin(user, folder)
 
     tts_collection.delete_many({"folder_id": folder_id})
     voice_folders_collection.delete_one({"_id": oid})
@@ -140,7 +149,7 @@ async def _generate_audio_bytes(text: str, language_code: str, speaker: str, pac
 
 
 @router.post("/generate")
-async def generate_speech(payload: GenerateRequest):
+async def generate_speech(payload: GenerateRequest, user: dict = Depends(require_permission("tts", "generate"))):
     """Generates speech for every selected language, scoped to one voice
     folder. Each language's audio bytes are stored directly inside its
     MongoDB document (tts_audio collection, keyed by folder_id + language) -
@@ -149,6 +158,7 @@ async def generate_speech(payload: GenerateRequest):
     folder = voice_folders_collection.find_one({"_id": _oid(payload.folder_id)})
     if not folder:
         raise HTTPException(404, "Voice folder not found")
+    assert_owns_or_admin(user, folder)
     if not payload.text.strip():
         raise HTTPException(422, "Text is required")
 
@@ -207,15 +217,24 @@ async def generate_speech(payload: GenerateRequest):
 
 
 @router.get("/history")
-def tts_history(folder_id: str | None = Query(default=None, description="Filter to a single folder's voices")):
+def tts_history(folder_id: str | None = Query(default=None, description="Filter to a single folder's voices"), user: dict = Depends(require_any_permission(("tts", "view"), ("voices", "view")))):
     """Generated language audios. Pass folder_id to scope to one folder;
     omit it to list everything (used by the Manage Voices page).
 
     Records from before folder-scoped voices existed have no folder_id and
     are skipped, since they can no longer be tied to any folder's directory.
     The raw audio_data binary is excluded from this list response - it's
-    fetched only on demand via the download endpoint."""
-    query = {"folder_id": folder_id} if folder_id else {"folder_id": {"$exists": True, "$ne": None}}
+    fetched only on demand via the download endpoint.
+
+    A plain user only ever sees voices in folders THEY created; admin/super_admin see everyone's."""
+    if folder_id:
+        assert_owns_or_admin(user, _folder_or_404(folder_id))
+        query = {"folder_id": folder_id}
+    else:
+        query = {"folder_id": {"$exists": True, "$ne": None}}
+        if user["role"] not in ("super_admin", "admin"):
+            owned_folder_ids = [str(f["_id"]) for f in voice_folders_collection.find(owner_filter(user), {"_id": 1})]
+            query["folder_id"] = {"$in": owned_folder_ids}
     docs = list(tts_collection.find(query, {"audio_data": 0}).sort("updated_at", -1))
     results = []
     for doc in docs:
@@ -228,9 +247,10 @@ def tts_history(folder_id: str | None = Query(default=None, description="Filter 
 
 
 @router.get("/download/{folder_id}/{filename}")
-def download_audio(folder_id: str, filename: str):
+def download_audio(folder_id: str, filename: str, user: dict = Depends(require_any_permission(("tts", "view"), ("voices", "view")))):
     """Streams the audio straight out of MongoDB in real time - nothing is
     ever read from local disk."""
+    assert_owns_or_admin(user, _folder_or_404(folder_id))
     doc = tts_collection.find_one({"folder_id": folder_id, "filename": filename})
     if not doc or not doc.get("audio_data"):
         raise HTTPException(404, "Audio not found")
@@ -242,9 +262,10 @@ def download_audio(folder_id: str, filename: str):
 
 
 @router.delete("/{folder_id}/{language_code}")
-def delete_voice(folder_id: str, language_code: str):
+def delete_voice(folder_id: str, language_code: str, user: dict = Depends(require_permission("tts", "delete"))):
     """Removes one generated language's DB record (audio included, since it
     lives inside that same document)."""
+    assert_owns_or_admin(user, _folder_or_404(folder_id))
     result = tts_collection.delete_one({"folder_id": folder_id, "language_code": language_code})
     if result.deleted_count == 0:
         raise HTTPException(404, "Voice not found")

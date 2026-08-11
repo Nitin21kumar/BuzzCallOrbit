@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { UploadCloud, FileAudio, History, Mic, Square, Trash2 } from 'lucide-react'
 import { LANGUAGES } from '../languages'
 import * as api from '../api'
+import PermissionNotice from './PermissionNotice.jsx'
 
 export default function SpeechToText() {
   const [mode, setMode] = useState('upload') // 'upload' | 'record'
@@ -12,6 +13,7 @@ export default function SpeechToText() {
   const [transcribing, setTranscribing] = useState(false)
   const [result, setResult] = useState(null)
   const [history, setHistory] = useState([])
+  const [noViewAccess, setNoViewAccess] = useState(false)
 
   const [isRecording, setIsRecording] = useState(false)
   const [recordSeconds, setRecordSeconds] = useState(0)
@@ -21,8 +23,13 @@ export default function SpeechToText() {
   const timerRef = useRef(null)
 
   const loadHistory = async () => {
-    const res = await api.getSttHistory()
-    setHistory(res.data)
+    try {
+      const res = await api.getSttHistory()
+      setHistory(res.data)
+    } catch (error) {
+      if (error?.response?.status === 403) { setNoViewAccess(true); return }
+      throw error
+    }
   }
 
   useEffect(() => { loadHistory() }, [])
@@ -206,7 +213,8 @@ export default function SpeechToText() {
         <div style={styles.card}>
           <h3 style={styles.cardTitle}><History size={16} style={{ marginRight: 6, verticalAlign: -2 }} />Transcription History</h3>
           <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 480, overflowY: 'auto' }}>
-            {history.length === 0 && <p style={{ color: 'var(--text-secondary)', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>No transcriptions yet.</p>}
+            {noViewAccess && <PermissionNotice label="transcription history" />}
+            {!noViewAccess && history.length === 0 && <p style={{ color: 'var(--text-secondary)', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>No transcriptions yet.</p>}
             {history.map((item) => (
               <div key={item._id} style={styles.historyRow}>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{item.filename} · {item.language_code} · {new Date(item.created_at).toLocaleString()}</div>
@@ -246,7 +254,7 @@ const styles = {
   },
   micBtn: {
     width: 64, height: 64, borderRadius: '50%', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-purple))', color: '#fff', cursor: 'pointer',
+    background: 'linear-gradient(135deg, var(--accent-purple), var(--warning))', color: '#fff', cursor: 'pointer',
   },
   micBtnActive: { background: '#E4483E', animation: 'pulse 1.4s infinite' },
   reRecordBtn: {
@@ -261,7 +269,7 @@ const styles = {
   generateBtn: {
     width: '100%', marginTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
     padding: '13px 16px', borderRadius: 12, border: 'none', fontSize: 14, fontWeight: 700, color: '#fff',
-    background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-purple))',
+    background: 'linear-gradient(135deg, var(--accent-purple), var(--warning))',
   },
   resultBox: { marginTop: 20, padding: 16, borderRadius: 12, background: '#FAFAFD', border: '1px solid var(--border)' },
   historyRow: { padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)' },

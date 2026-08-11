@@ -1,18 +1,26 @@
 import { useState, useEffect } from 'react'
 import { Music2, Trash2, Download, RefreshCw, FolderX } from 'lucide-react'
 import * as api from '../api'
+import PermissionNotice from './PermissionNotice.jsx'
 
 export default function ManageVoices() {
   const [folders, setFolders] = useState([])
   const [allVoices, setAllVoices] = useState([])
   const [loading, setLoading] = useState(true)
+  const [noViewAccess, setNoViewAccess] = useState(false)
 
   const load = async () => {
     setLoading(true)
-    const [foldersRes, voicesRes] = await Promise.all([api.listVoiceFolders(), api.getTtsHistory()])
-    setFolders(foldersRes.data)
-    setAllVoices(voicesRes.data)
-    setLoading(false)
+    try {
+      const [foldersRes, voicesRes] = await Promise.all([api.listVoiceFolders(), api.getTtsHistory()])
+      setFolders(foldersRes.data)
+      setAllVoices(voicesRes.data)
+    } catch (error) {
+      if (error?.response?.status === 403) setNoViewAccess(true)
+      else throw error
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { load() }, [])
@@ -49,7 +57,9 @@ export default function ManageVoices() {
         </button>
       </div>
 
-      {folders.length === 0 && !loading && (
+      {noViewAccess && <PermissionNotice label="voice folders" />}
+
+      {folders.length === 0 && !loading && !noViewAccess && (
         <div style={styles.emptyCard}>
           <Music2 size={26} color="var(--text-secondary)" />
           <p style={{ ...styles.hint, marginTop: 10 }}>No voice folders yet. Go to Text to Speech to create one.</p>

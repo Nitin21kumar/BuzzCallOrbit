@@ -1,0 +1,65 @@
+/* ===== App shell layout (Step 1: Layout) ===== */
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--bg-app);
+}
+
+.app-content-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative; /* anchor point for the search overlay */
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+  padding: 32px 40px;
+  box-sizing: border-box;
+}
+
+.app-main--flush {
+  padding: 18px 24px;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* WhatsApp OBD: only the tab content scrolls (see the inner overflowY:auto
+   div in WhatsAppCampaigns.jsx) — the title/tab-switcher row above it stays
+   fixed in place instead of scrolling away with a long campaign list. */
+.app-main--whatsapp {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Sidebar collapses to icon rail on tablet, drawer on mobile handled in Sidebar step */
+@media (max-width: 1180px) {
+  .app-main { padding: 24px; }
+  /* Laptop/tablet must STILL fit one screen (spec: "Laptop: same layout, proportional scaling") -
+     only shrink padding here, never switch to height:auto/overflow:visible or the page starts
+     scrolling on every normal laptop window width. */
+  .app-main--flush { padding: 16px 18px; }
+}
+
+@media (max-width: 860px) {
+  .app-shell { flex-direction: column; }
+  .app-main { padding: 16px; }
+  /* Only true mobile (stacked single-column layout) is allowed to scroll naturally */
+  .app-main--flush {
+    padding: 16px;
+    height: auto;
+    overflow: visible;
+  }
+  .app-main--whatsapp {
+    height: auto;
+    overflow: visible;
+    display: block;
+  }
+}

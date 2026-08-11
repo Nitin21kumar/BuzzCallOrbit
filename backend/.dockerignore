@@ -3,4 +3,5 @@ __pycache__/
 app/__pycache__/
 app/routers/__pycache__/
 .env
+firebase-service-account.json
 *.pyc

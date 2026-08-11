@@ -1,0 +1,58 @@
+/* ===================================================================
+   Welcome-back popup (shown once per session on the dashboard)
+   =================================================================== */
+.welcome-modal-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(11, 14, 31, 0.55);
+  backdrop-filter: blur(3px);
+  padding: 20px;
+  animation: welcome-fade-in 0.22s ease-out;
+}
+@keyframes welcome-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.welcome-modal-card {
+  position: relative;
+  width: 100%; max-width: 380px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 32px 28px 26px;
+  text-align: center;
+  box-shadow: 0 30px 80px rgba(16, 21, 42, 0.35);
+  animation: welcome-pop-in 0.28s cubic-bezier(.2, .9, .3, 1.3);
+}
+@keyframes welcome-pop-in {
+  from { opacity: 0; transform: scale(0.92) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.welcome-modal-close {
+  position: absolute; top: 14px; right: 14px;
+  width: 28px; height: 28px; border-radius: 50%;
+  display: grid; place-items: center;
+  border: none; background: var(--track-bg); color: var(--text-secondary);
+  cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
+}
+.welcome-modal-close:hover { background: var(--danger-soft); color: var(--danger); }
+
+.welcome-modal-icon {
+  margin: 0 auto; width: 58px; height: 58px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: linear-gradient(145deg, var(--accent-purple), var(--warning));
+  box-shadow: 0 12px 26px var(--accent-purple-soft);
+}
+
+.welcome-modal-title { margin: 16px 0 0; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; color: var(--text-primary); }
+.welcome-modal-sub { margin: 8px 0 0; font-size: 13px; line-height: 1.5; color: var(--text-secondary); }
+
+.welcome-modal-btn {
+  margin-top: 22px; width: 100%;
+  border: none; border-radius: 12px; cursor: pointer;
+  background: linear-gradient(90deg, var(--accent-purple), var(--warning));
+  color: #fff; font-size: 14px; font-weight: 700;
+  padding: 12px; box-shadow: 0 10px 22px var(--accent-purple-soft);
+  transition: transform 0.15s ease;
+}
+.welcome-modal-btn:hover { transform: translateY(-1px); }
+
