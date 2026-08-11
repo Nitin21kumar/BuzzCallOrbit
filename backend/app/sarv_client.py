@@ -126,6 +126,29 @@ def trigger_voice_broadcast(audio_url: str, mobile_numbers: list[str], callback_
     return data
 
 
+def map_callback_status(status: Optional[str]) -> str:
+    """Maps the status Sarv sends on the webhook callback (seen so far:
+    "Answered") onto this app's status buckets. This is a DIFFERENT
+    vocabulary from map_sarv_status() above, which only covers the
+    broadcasting-request response ("success"/"failed"/"invalid"). Extend
+    this as you observe more real callback values (e.g. "Busy",
+    "No Answer", "Failed", "Rejected")."""
+    if not status:
+        return "completed"
+    s = status.strip().lower()
+    if s == "answered":
+        return "completed"
+    if s == "busy":
+        return "busy"
+    if s in ("no answer", "noanswer", "not answered", "no-answer"):
+        return "no-answer"
+    if s in ("failed", "rejected", "cancelled", "canceled", "invalid"):
+        return "failed"
+    # Unknown value - log it via the caller and default to "completed" since
+    # the callback only fires once Sarv has finished processing the call.
+    return "completed"
+
+
 def map_sarv_status(status: Optional[str]) -> str:
     """Maps Sarv's per-contact `status` field (seen so far: "success") onto
     this app's existing status buckets. "success" here just means Sarv
