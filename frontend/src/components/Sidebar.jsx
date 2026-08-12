@@ -4,15 +4,15 @@ import * as api from '../api'
 import logo from '../assets/logo.jpeg'
 
 const NAV_ITEMS = [
-  { key: 'dashboard', label: 'Dashboard', icon: LayoutGrid, dot: '#22C55E' },
-  { key: 'campaigns', label: 'Campaigns', icon: Megaphone, dot: '#7C5CFC' },
-  { key: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, dot: '#25D366' },
-  { key: 'sms', label: 'SMS', icon: MessageSquareText, dot: '#3B82F6', alwaysVisible: true, badge: 'Soon' },
-  { key: 'rcs', label: 'RCS', icon: Radio, dot: '#A855F7', alwaysVisible: true, badge: 'Soon' },
-  { key: 'tts', label: 'Text to Speech', icon: AudioLines, dot: '#3B82F6' },
-  { key: 'stt', label: 'Speech to Text', icon: FileAudio, dot: '#F59E0B' },
-  { key: 'voices', label: 'Manage Voices', icon: Music2, dot: '#EC4899' },
-  { key: 'users', label: 'User Management', icon: UsersIcon, dot: '#14B8A6' },
+  { key: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
+  { key: 'campaigns', label: 'Campaigns', icon: Megaphone },
+  { key: 'whatsapp', label: 'WhatsApp', icon: MessageCircle },
+  { key: 'sms', label: 'SMS', icon: MessageSquareText, alwaysVisible: true },
+  { key: 'rcs', label: 'RCS', icon: Radio, alwaysVisible: true },
+  { key: 'tts', label: 'Text to Speech', icon: AudioLines },
+  { key: 'stt', label: 'Speech to Text', icon: FileAudio },
+  { key: 'voices', label: 'Manage Voices', icon: Music2 },
+  { key: 'users', label: 'User Management', icon: UsersIcon },
 ]
 
 const ROLE_LABEL = { super_admin: 'Super Admin', admin: 'Admin', user: 'User' }
