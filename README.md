@@ -5,6 +5,8 @@ A fresh, standalone project with three features:
 - **Speech to Text** — upload audio and get a transcript (Sarvam AI, Saaras v3).
 - **OBD Campaigns** — upload a contact sheet + a voice message, auto-dial every contact via Sarv's Voice Broadcast API, and track status (polled from Sarv's Fetch Voice Report API). Includes an insights dashboard (total calls, success rate, recent activity) styled after the reference design.
 
+Want to run the whole thing with Docker on your own machine (not deploying anywhere)? See **`LOCAL_DOCKER.md`** instead of the steps below.
+
 ## Project Structure
 ```
 obd-suite/

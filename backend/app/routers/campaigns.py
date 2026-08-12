@@ -1,4 +1,5 @@
 import io
+import logging
 import os
 import re
 import time
@@ -18,6 +19,7 @@ from ..constants import LANGUAGE_DISPLAY
 from .. import sarv_client
 
 router = APIRouter(tags=["obd-campaigns"])
+logger = logging.getLogger("sarv_campaigns")
 
 # Maps both language codes ("hi-IN") and display names ("Hindi"), case-insensitively,
 # to the canonical display name used to build the saved filename (e.g. "hindi.mp3").
@@ -355,8 +357,13 @@ def run_calls(campaign_id: str):
         for i in range(0, len(items), sarv_client.SARV_MAX_CONTACTS_PER_REQUEST):
             batch = items[i:i + sarv_client.SARV_MAX_CONTACTS_PER_REQUEST]
             mobiles = [b["mobile"] for b in batch]
+            logger.info("Triggering Sarv broadcast: audio_url=%s mobiles=%s", group["audio_url"], mobiles)
             try:
                 result = sarv_client.trigger_voice_broadcast(group["audio_url"], mobiles, callback_url=callback_url)
+                # Log Sarv's FULL raw response - not just the fields we parse below -
+                # so if a call rings but plays no audio, the actual reason Sarv gives
+                # (if any) is visible in the logs instead of us having to guess.
+                logger.info("Sarv broadcast response for audio_url=%s: %s", group["audio_url"], result)
                 returned = result.get("data", [])
                 # Match by mobileNumber rather than position, in case Sarv
                 # drops/reorders invalid entries in the response.
@@ -379,6 +386,7 @@ def run_calls(campaign_id: str):
                         update["ended_at"] = datetime.utcnow()
                     call_logs_collection.update_one({"_id": b["call_log_id"]}, {"$set": update})
             except Exception as exc:
+                logger.warning("Sarv broadcast request failed for audio_url=%s: %s", group["audio_url"], exc)
                 for b in batch:
                     call_logs_collection.update_one({"_id": b["call_log_id"]}, {"$set": {
                         "status": "failed", "error_message": str(exc)[:500],
@@ -579,9 +587,6 @@ def obd_campaign_performance(user: dict = Depends(require_permission("dashboard"
 # were Twilio-specific (Twilio called them mid-call and on status changes).
 # Sarv's vb-api v2 /broadcasting instead pushes updates to whatever
 # `callback_url` you passed on the original request - handled below.
-
-import logging
-logger = logging.getLogger("sarv_webhook")
 
 
 @router.post("/api/campaigns/webhooks/sarv-status")

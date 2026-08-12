@@ -17,10 +17,10 @@ services:
       context: ./frontend
       args:
         VITE_API_BASE_URL: http://localhost:8000
-        # docker-compose doesn't read frontend/.env automatically for build
-        # args - either hardcode your dev Firebase project's values here, or
-        # run `docker compose --env-file frontend/.env up --build` so these
-        # ${VAR} references resolve from that file instead.
+        # These ${VAR} placeholders are filled in automatically from a ".env"
+        # file at the project root (docker-compose loads it by default) -
+        # copy .env.example to .env and fill in your Firebase project's
+        # values before running `docker compose up --build`.
         VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY}
         VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN}
         VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID}
