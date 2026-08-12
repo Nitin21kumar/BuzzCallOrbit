@@ -21,6 +21,7 @@ export default function WhatsAppCampaigns() {
   const [deletingContacts, setDeletingContacts] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [starting, setStarting] = useState(false)
+  const [downloadingReport, setDownloadingReport] = useState(false)
   const [status, setStatus] = useState(null)
 
   const activeCampaign = campaigns.find((c) => c.id === activeId) || null
@@ -130,11 +131,22 @@ export default function WhatsAppCampaigns() {
     }
   }
 
+  const handleDownloadReport = async (campaignId) => {
+    setDownloadingReport(true)
+    try {
+      await api.downloadWhatsAppReport(campaignId)
+    } catch (error) {
+      alert(error.response?.data?.detail || 'Could not download the report')
+    } finally {
+      setDownloadingReport(false)
+    }
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <div style={{ ...styles.headerRow, flexShrink: 0 }}>
         <div>
-          <h1 style={styles.title}><MessageCircle size={20} style={{ verticalAlign: 'middle', marginRight: 8 }} />WhatsApp OBD</h1>
+          <h1 style={styles.title}><MessageCircle size={20} style={{ verticalAlign: 'middle', marginRight: 8 }} />WhatsApp</h1>
           <p style={styles.sub}>Broadcast approved templates and let AI-powered auto-replies handle incoming messages.</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -228,9 +240,9 @@ export default function WhatsAppCampaigns() {
                         <div style={styles.miniStat}><span style={styles.miniLabel}>Failed</span><div style={{ ...styles.miniValue, color: 'var(--danger)' }}>{status.failed}</div></div>
                         <div style={styles.miniStat}><span style={styles.miniLabel}>Queued</span><div style={{ ...styles.miniValue, color: 'var(--warning)' }}>{status.queued}</div></div>
                       </div>
-                      <a href={api.getWhatsAppReportUrl(activeCampaign.id)}>
-                        <button style={styles.downloadBtn}><Download size={16} /> Download Excel report</button>
-                      </a>
+                      <button style={styles.downloadBtn} onClick={() => handleDownloadReport(activeCampaign.id)} disabled={downloadingReport}>
+                        <Download size={16} /> {downloadingReport ? 'Downloading…' : 'Download Excel report'}
+                      </button>
                     </>
                   ) : <div style={styles.emptyCard}><MessageCircle size={22} color="var(--text-secondary)" /><p style={styles.hint}>Loading status…</p></div>}
                 </div>

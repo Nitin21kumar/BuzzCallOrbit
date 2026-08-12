@@ -6,7 +6,7 @@ import logo from '../assets/logo.jpeg'
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutGrid, dot: '#22C55E' },
   { key: 'campaigns', label: 'Campaigns', icon: Megaphone, dot: '#7C5CFC' },
-  { key: 'whatsapp', label: 'WhatsApp OBD', icon: MessageCircle, dot: '#25D366' },
+  { key: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, dot: '#25D366' },
   { key: 'sms', label: 'SMS', icon: MessageSquareText, dot: '#3B82F6', alwaysVisible: true, badge: 'Soon' },
   { key: 'rcs', label: 'RCS', icon: Radio, dot: '#A855F7', alwaysVisible: true, badge: 'Soon' },
   { key: 'tts', label: 'Text to Speech', icon: AudioLines, dot: '#3B82F6' },
@@ -60,7 +60,7 @@ export default function Sidebar({ active, setActive, collapsed, onToggleCollapse
   }, [canSeeWhatsApp])
 
   // Polls for conversations waiting on a human reply, so a paused AI chat
-  // isn't missed even if the WhatsApp OBD tab isn't open. Only polls (and
+  // isn't missed even if the WhatsApp tab isn't open. Only polls (and
   // only shows the nav badge) when the signed-in user actually has access
   // to the WhatsApp module — no point hitting an endpoint they can't use.
   useEffect(() => {

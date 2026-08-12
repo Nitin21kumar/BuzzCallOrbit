@@ -41,7 +41,7 @@ contacts_collection = db["contacts"]
 call_logs_collection = db["call_logs"]
 users_collection = db["users"]         # {uid, email, name, role, modules, services, fields, active, created_by, created_at}
 
-# WhatsApp OBD (Meta Cloud API)
+# WhatsApp (Meta Cloud API)
 whatsapp_campaigns_collection = db["whatsapp_campaigns"]   # one doc per broadcast campaign (template + language)
 whatsapp_contacts_collection = db["whatsapp_contacts"]     # per-campaign contact list + per-contact send status
 whatsapp_messages_collection = db["whatsapp_messages"]     # full conversation log, both directions, keyed by phone number

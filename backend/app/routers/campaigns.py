@@ -122,15 +122,22 @@ def set_voice_source(campaign_id: str, payload: VoiceSourceUpdate, user: dict = 
 
 
 @router.get("/api/campaigns/{campaign_id}/audio")
-def get_campaign_audio(campaign_id: str, user: dict = Depends(require_permission("campaigns", "view"))):
+def get_campaign_audio(campaign_id: str):
     """Streams this campaign's default audio straight out of MongoDB in real
-    time - nothing is ever read from local disk. Used both by Twilio's
-    <Play> during a live call and for in-app preview/download."""
+    time - nothing is ever read from local disk. Used both by Sarv's phone
+    system fetching it directly during a live call, and for in-app preview/
+    download.
+
+    Deliberately NOT behind require_permission(): Sarv's servers hit this
+    URL directly (it's the audio_url we hand it in run_calls()) and have no
+    way to send our app's login token - only Firebase-authenticated users
+    can ever discover a real campaign_id in the first place (via the
+    already-protected list/detail endpoints), so this stays effectively
+    private without blocking the one external caller that actually needs it."""
     oid = _oid(campaign_id)
-    campaign = campaigns_collection.find_one({"_id": oid}, {"audio_data": 1, "audio_content_type": 1, "audio_filename": 1, "created_by": 1})
+    campaign = campaigns_collection.find_one({"_id": oid}, {"audio_data": 1, "audio_content_type": 1, "audio_filename": 1})
     if not campaign or not campaign.get("audio_data"):
         raise HTTPException(404, "No default audio uploaded for this campaign")
-    assert_owns_or_admin(user, campaign)
     return Response(
         content=bytes(campaign["audio_data"]),
         media_type=campaign.get("audio_content_type", "audio/mpeg"),

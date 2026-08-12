@@ -57,7 +57,30 @@ export const uploadCampaignAudio = (id, file) => {
   form.append('file', file)
   return api.post(`/api/campaigns/${id}/upload-audio`, form)
 }
+// Direct <a href> links can't carry the Firebase auth token (browser
+// navigation doesn't run our axios interceptor), and these report endpoints
+// now require auth like everything else — so downloads go through this
+// authenticated blob-fetch instead of a plain link.
+async function downloadAuthenticatedFile(url, filename) {
+  const response = await api.get(url, { responseType: 'blob' })
+  const blobUrl = window.URL.createObjectURL(new Blob([response.data]))
+  const link = document.createElement('a')
+  link.href = blobUrl
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.URL.revokeObjectURL(blobUrl)
+}
+
 export const getCampaignAudioUrl = (id) => `${API_BASE}/api/campaigns/${id}/audio`
+// The <audio> element's src also can't carry an auth header (same problem as
+// direct <a href> report links), so preview playback fetches the audio as an
+// authenticated blob and hands the <audio> tag a local object URL instead.
+export const getCampaignAudioBlobUrl = async (id) => {
+  const response = await api.get(`/api/campaigns/${id}/audio`, { responseType: 'blob' })
+  return window.URL.createObjectURL(new Blob([response.data]))
+}
 export const uploadCampaignContacts = (id, file) => {
   const form = new FormData()
   form.append('file', file)
@@ -67,11 +90,12 @@ export const deleteCampaignContacts = (id) => api.delete(`/api/campaigns/${id}/c
 export const startCampaign = (id) => api.post(`/api/campaigns/${id}/start`)
 export const getCampaignStatus = (id) => api.get(`/api/campaigns/${id}/status`)
 export const getCampaignReportUrl = (id) => `${API_BASE}/api/campaigns/${id}/report`
+export const downloadCampaignReport = (id) => downloadAuthenticatedFile(`/api/campaigns/${id}/report`, `campaign_${id}_report.xlsx`)
 export const getObdOverview = () => api.get('/api/obd/overview')
 export const getDailyStats = () => api.get('/api/obd/daily-stats')
 export const getCampaignPerformance = () => api.get('/api/obd/campaign-performance')
 
-// --- WhatsApp OBD ---
+// --- WhatsApp ---
 export const createWhatsAppCampaign = (name, templateName, templateLanguage, campaignContext, messageText, sourceLanguageCode) =>
   api.post('/api/whatsapp', {
     name, template_name: templateName, template_language: templateLanguage,
@@ -88,6 +112,7 @@ export const deleteWhatsAppContacts = (id) => api.delete(`/api/whatsapp/${id}/co
 export const startWhatsAppCampaign = (id) => api.post(`/api/whatsapp/${id}/start`)
 export const getWhatsAppCampaignStatus = (id) => api.get(`/api/whatsapp/${id}/status`)
 export const getWhatsAppReportUrl = (id) => `${API_BASE}/api/whatsapp/${id}/report`
+export const downloadWhatsAppReport = (id) => downloadAuthenticatedFile(`/api/whatsapp/${id}/report`, `whatsapp_campaign_${id}_report.xlsx`)
 export const listWhatsAppConversations = () => api.get('/api/whatsapp/conversations')
 export const getWhatsAppConversation = (phoneNumber) => api.get(`/api/whatsapp/conversations/${encodeURIComponent(phoneNumber)}/messages`)
 export const createWhatsAppTemplate = (name, category, languageCode, bodyExample, staticPrefix, staticSuffix) =>

@@ -418,7 +418,7 @@ def list_conversations(user: dict = Depends(require_permission("whatsapp", "inbo
 def get_handoff_count(user: dict = Depends(require_permission("whatsapp", "inbox_view"))):
     """Number of conversations currently waiting on a human (handoff=true) —
     powers the notification badge in the sidebar so a paused chat isn't
-    missed if the WhatsApp OBD tab isn't open."""
+    missed if the WhatsApp tab isn't open."""
     count = whatsapp_conversations_collection.count_documents({"handoff": True})
     return {"count": count}
 

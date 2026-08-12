@@ -29,7 +29,7 @@
   justify-content: center;
 }
 
-/* WhatsApp OBD: only the tab content scrolls (see the inner overflowY:auto
+/* WhatsApp: only the tab content scrolls (see the inner overflowY:auto
    div in WhatsAppCampaigns.jsx) — the title/tab-switcher row above it stays
    fixed in place instead of scrolling away with a long campaign list. */
 .app-main--whatsapp {

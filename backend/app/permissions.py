@@ -61,7 +61,7 @@ MODULE_CATALOG = {
         "fields": ["budget", "script", "contact_list", "schedule"],
     },
     "whatsapp": {
-        "label": "WhatsApp OBD",
+        "label": "WhatsApp",
         "services": {
             "view": "View campaigns & reports",
             "create": "Create campaigns",

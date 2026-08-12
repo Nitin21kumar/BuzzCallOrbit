@@ -20,7 +20,7 @@ import UnderDevelopment from './components/UnderDevelopment.jsx'
 import AccessDenied from './components/AccessDenied.jsx'
 
 const ALL_MODULES = ['dashboard', 'campaigns', 'whatsapp', 'tts', 'stt', 'voices', 'users']
-const MODULE_LABEL = { dashboard: 'Dashboard', campaigns: 'Campaigns', whatsapp: 'WhatsApp OBD', tts: 'Text to Speech', stt: 'Speech to Text', voices: 'Manage Voices', users: 'User Management', sms: 'SMS', rcs: 'RCS' }
+const MODULE_LABEL = { dashboard: 'Dashboard', campaigns: 'Campaigns', whatsapp: 'WhatsApp', tts: 'Text to Speech', stt: 'Speech to Text', voices: 'Manage Voices', users: 'User Management', sms: 'SMS', rcs: 'RCS' }
 // SMS and RCS are placeholder "coming soon" pages with no real functionality
 // or data yet, so — unlike every other module — they're open to any signed-in
 // user regardless of their granted permissions (mirrors Sidebar.jsx's

@@ -21,11 +21,25 @@ export default function Campaigns({ initialCreate, onConsumeCreate, onGoToDashbo
   const [uploadingContacts, setUploadingContacts] = useState(false)
   const [deletingContacts, setDeletingContacts] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
+  const [downloadingReportId, setDownloadingReportId] = useState(null)
   const [starting, setStarting] = useState(false)
   const [status, setStatus] = useState(null)
 
   const activeCampaign = campaigns.find((c) => c.id === activeId) || null
   const launched = activeCampaign ? activeCampaign.status !== 'draft' : false
+
+  const [audioBlobUrl, setAudioBlobUrl] = useState(null)
+  useEffect(() => {
+    if (!activeCampaign?.audio_filename) { setAudioBlobUrl(null); return }
+    let cancelled = false
+    let objectUrl = null
+    api.getCampaignAudioBlobUrl(activeCampaign.id).then((url) => {
+      if (cancelled) { window.URL.revokeObjectURL(url); return }
+      objectUrl = url
+      setAudioBlobUrl(url)
+    }).catch(() => setAudioBlobUrl(null))
+    return () => { cancelled = true; if (objectUrl) window.URL.revokeObjectURL(objectUrl) }
+  }, [activeCampaign?.id, activeCampaign?.audio_filename])
 
   const loadCampaigns = async () => {
     try {
@@ -161,6 +175,17 @@ export default function Campaigns({ initialCreate, onConsumeCreate, onGoToDashbo
     }
   }
 
+  const handleDownloadReport = async (campaignId) => {
+    setDownloadingReportId(campaignId)
+    try {
+      await api.downloadCampaignReport(campaignId)
+    } catch (error) {
+      alert(error.response?.data?.detail || 'Could not download the report')
+    } finally {
+      setDownloadingReportId(null)
+    }
+  }
+
   const chartData = status ? [
     { name: 'Completed', value: status.completed, color: '#22C55E' },
     { name: 'Failed / Declined', value: status.failed_or_declined, color: '#F04438' },
@@ -229,7 +254,7 @@ export default function Campaigns({ initialCreate, onConsumeCreate, onGoToDashbo
               {activeCampaign.audio_filename && (
                 <>
                   <p style={styles.successHint}><CheckCircle2 size={13} /> Fallback audio: {activeCampaign.audio_filename}</p>
-                  <audio controls src={api.getCampaignAudioUrl(activeCampaign.id)} style={{ width: '100%', height: 32, marginTop: 6 }} />
+                  <audio controls src={audioBlobUrl || undefined} style={{ width: '100%', height: 32, marginTop: 6 }} />
                 </>
               )}
             </div>
@@ -285,9 +310,9 @@ export default function Campaigns({ initialCreate, onConsumeCreate, onGoToDashbo
                     </div>
                   ) : <p style={styles.hint}>Chart appears once calls are triggered.</p>}
                 </div>
-                <a href={api.getCampaignReportUrl(activeCampaign.id)}>
-                  <button style={styles.downloadBtn}><Download size={16} /> Download Excel report</button>
-                </a>
+                <button style={styles.downloadBtn} onClick={() => handleDownloadReport(activeCampaign.id)} disabled={downloadingReportId === activeCampaign.id}>
+                  <Download size={16} /> {downloadingReportId === activeCampaign.id ? 'Downloading…' : 'Download Excel report'}
+                </button>
               </>
             ) : <div style={styles.emptyCard}><Megaphone size={22} color="var(--text-secondary)" /><p style={styles.hint}>Loading status…</p></div>}
           </div>
@@ -334,7 +359,9 @@ export default function Campaigns({ initialCreate, onConsumeCreate, onGoToDashbo
                 <td style={{ ...styles.td, color: 'var(--text-secondary)' }}>{new Date(c.created_at).toLocaleString()}</td>
                 <td style={{ ...styles.td, textAlign: 'right' }}>
                   <button onClick={() => { setActiveId(c.id); setStatus(null); setView('detail') }} style={styles.actionBtn}><Eye size={13} /> View</button>
-                  <a href={api.getCampaignReportUrl(c.id)}><button style={{ ...styles.actionBtn, marginLeft: 8 }}><Download size={13} /> Report</button></a>
+                  <button style={{ ...styles.actionBtn, marginLeft: 8 }} onClick={() => handleDownloadReport(c.id)} disabled={downloadingReportId === c.id}>
+                    <Download size={13} /> {downloadingReportId === c.id ? '…' : 'Report'}
+                  </button>
                   <button
                     onClick={() => handleDeleteCampaign(c.id, c.name)}
                     disabled={deletingId === c.id}

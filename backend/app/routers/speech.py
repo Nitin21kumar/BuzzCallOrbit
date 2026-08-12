@@ -247,10 +247,16 @@ def tts_history(folder_id: str | None = Query(default=None, description="Filter 
 
 
 @router.get("/download/{folder_id}/{filename}")
-def download_audio(folder_id: str, filename: str, user: dict = Depends(require_any_permission(("tts", "view"), ("voices", "view")))):
+def download_audio(folder_id: str, filename: str):
     """Streams the audio straight out of MongoDB in real time - nothing is
-    ever read from local disk."""
-    assert_owns_or_admin(user, _folder_or_404(folder_id))
+    ever read from local disk.
+
+    Deliberately NOT behind require_permission(): this is the same audio_url
+    Sarv's servers fetch directly during a live call (run_calls() in
+    campaigns.py builds URLs pointing here), and Sarv has no way to send our
+    app's login token. A folder_id + filename pair is effectively unguessable,
+    and the only way to ever learn a real one is through the already-protected
+    /folders and /history endpoints, so this stays private in practice."""
     doc = tts_collection.find_one({"folder_id": folder_id, "filename": filename})
     if not doc or not doc.get("audio_data"):
         raise HTTPException(404, "Audio not found")

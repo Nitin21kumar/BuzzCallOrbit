@@ -168,6 +168,12 @@ function UserFormModal({ user, catalog, assignableRoles, onClose, onSaved }) {
 
   const needsGranularAccess = role === 'user'
 
+  // Checking a module grants FULL access to it by default (every
+  // service + field) — e.g. ticking "Campaigns" means that person can
+  // actually create/edit/delete/trigger campaigns right away, not just see
+  // an empty page. Admin can still fine-tune afterward by unchecking
+  // specific actions below if they want to hand out partial (e.g.
+  // view-only) access instead.
   const toggleModule = (modKey, modConfig) => {
     setModules((prev) => {
       const next = new Set(prev)
@@ -177,6 +183,8 @@ function UserFormModal({ user, catalog, assignableRoles, onClose, onSaved }) {
         setFields((f) => { const nf = new Set(f); modConfig.fields.forEach((fl) => nf.delete(fl.key)); return nf })
       } else {
         next.add(modKey)
+        setServices((s) => { const ns = new Set(s); modConfig.services.forEach((svc) => ns.add(svc.key)); return ns })
+        setFields((f) => { const nf = new Set(f); modConfig.fields.forEach((fl) => nf.add(fl.key)); return nf })
       }
       return next
     })
@@ -272,6 +280,9 @@ function UserFormModal({ user, catalog, assignableRoles, onClose, onSaved }) {
           {needsGranularAccess && (
             <div className="permission-tree">
               <div className="auth-field-label" style={{ marginBottom: 4 }}>Modules, actions &amp; fields</div>
+              <p style={{ fontSize: 11.5, color: 'var(--text-secondary)', margin: '0 0 10px' }}>
+                Ticking a module grants full access to it right away — uncheck specific actions below if you'd rather hand out partial (e.g. view-only) access instead.
+              </p>
               {catalog?.modules?.map((mod) => (
                 <div key={mod.key} className="permission-module">
                   <label className="permission-module-header">
