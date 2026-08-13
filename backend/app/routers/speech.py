@@ -132,8 +132,15 @@ async def _generate_audio_bytes(text: str, language_code: str, speaker: str, pac
                     "pace": pace,
                     "temperature": temperature,
                     "speech_sample_rate": 8000,
-                    "output_audio_codec": "mp3",
-                    "output_audio_bitrate": "128k",
+                    # WAV/PCM instead of MP3 - Sarvam's own IVR/telephony docs
+                    # recommend "standard WAV/PCM output at 8kHz" for telephony
+                    # playback (Genesys/Avaya/Twilio/Exotel/any SIP system).
+                    # Compressed MP3 plays fine in browsers (which are lenient
+                    # decoders) but was going silent on real Sarv calls despite
+                    # a normal call duration - a classic telephony-gateway
+                    # codec-compatibility symptom. output_audio_bitrate only
+                    # applies to compressed codecs, so it's dropped here.
+                    "output_audio_codec": "wav",
                     "enable_preprocessing": True,
                 },
             )
@@ -167,7 +174,7 @@ async def generate_speech(payload: GenerateRequest, user: dict = Depends(require
             results.append({"code": code, "language": code, "status": "failed", "error": "Unsupported language code"})
             continue
 
-        filename = f"{language_name.lower()}.mp3"
+        filename = f"{language_name.lower()}.wav"
 
         try:
             # Translate into this language first (unless the text is already in it),
@@ -250,7 +257,7 @@ def download_audio(folder_id: str, filename: str):
         raise HTTPException(404, "Audio not found")
     return Response(
         content=bytes(doc["audio_data"]),
-        media_type="audio/mpeg",
+        media_type="audio/wav",
         headers={"Content-Disposition": f'inline; filename="{filename}"'},
     )
 
