@@ -1,5 +1,7 @@
+import io
 import os
 import re
+import wave
 from datetime import datetime
 
 import httpx
@@ -154,12 +156,40 @@ async def _translate_text(text: str, source_code: str, target_code: str, gender:
     return await groq_client.translate_text(text, source_name, target_name, gender, strict_native_script=strict_native_script)
 
 
+def _merge_wav_chunks(wav_chunks: list[bytes]) -> bytes:
+    """Sarvam returns a COMPLETE WAV file (its own RIFF/fmt/data header included)
+    for every text chunk. Naively concatenating those raw bytes stacks extra
+    WAV headers in the middle of the audio - the telephony player reads that
+    header's bytes as noise/silence, which is exactly what produces the
+    "audio comes and goes mid-call" symptom on longer scripts that get split
+    into multiple chunks. This instead parses each chunk's real PCM frames
+    with the stdlib `wave` module and writes ONE valid WAV file with a single
+    header, so the whole thing plays back as continuous audio."""
+    if len(wav_chunks) == 1:
+        return wav_chunks[0]
+
+    params = None
+    frames: list[bytes] = []
+    for raw in wav_chunks:
+        with wave.open(io.BytesIO(raw), "rb") as wf:
+            if params is None:
+                params = wf.getparams()
+            frames.append(wf.readframes(wf.getnframes()))
+
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as out:
+        out.setparams(params)
+        for f in frames:
+            out.writeframes(f)
+    return buffer.getvalue()
+
+
 async def _generate_audio_bytes(text: str, language_code: str, speaker: str, pace: float, temperature: float) -> bytes:
     api_key = os.getenv("SARVAM_API_KEY")
     if not api_key:
         raise HTTPException(503, "SARVAM_API_KEY is not configured on the backend (.env)")
 
-    audio = b""
+    wav_chunks: list[bytes] = []
     async with httpx.AsyncClient(timeout=90) as client:
         for chunk in _split_text(text):
             response = await client.post(
@@ -191,8 +221,8 @@ async def _generate_audio_bytes(text: str, language_code: str, speaker: str, pac
                 except ValueError:
                     detail = response.text
                 raise HTTPException(response.status_code, detail or "Sarvam speech generation failed")
-            audio += response.content
-    return audio
+            wav_chunks.append(response.content)
+    return _merge_wav_chunks(wav_chunks)
 
 
 @router.post("/generate")
