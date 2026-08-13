@@ -100,10 +100,17 @@ async def _translate_text(text: str, source_code: str, target_code: str, gender:
     keep pronouns/verb conjugations consistent with the chosen speaker gender
     (e.g. "करना चाहता हूँ" for male vs "करना चाहती हूँ" for female in Hindi).
     The actual audio is still synthesized by Sarvam afterwards - Groq here
-    only produces the target-language text that gets sent to Sarvam TTS."""
+    only produces the target-language text that gets sent to Sarvam TTS.
+
+    When the target is Hindi, this forces a STRICT pure-Hindi (Devanagari)
+    translation - no English words left mixed in (no Hinglish). Groq's
+    default translation otherwise tends to leave common English loanwords
+    ("offer", "order", "update", etc.) untranslated, which we don't want
+    for the calling voice script."""
     source_name = LANGUAGE_NAMES.get(source_code, source_code)
     target_name = LANGUAGE_NAMES.get(target_code, target_code)
-    return await groq_client.translate_text(text, source_name, target_name, gender)
+    strict_native_script = target_code == "hi-IN"
+    return await groq_client.translate_text(text, source_name, target_name, gender, strict_native_script=strict_native_script)
 
 
 async def _generate_audio_bytes(text: str, language_code: str, speaker: str, pace: float, temperature: float) -> bytes:
