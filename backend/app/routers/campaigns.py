@@ -1,4 +1,5 @@
 import io
+import logging
 import os
 import re
 import time
@@ -18,6 +19,7 @@ from ..constants import LANGUAGE_DISPLAY
 from .. import sarv_client
 
 router = APIRouter(tags=["obd-campaigns"])
+logger = logging.getLogger("sarv_webhook")
 
 # Maps both language codes ("hi-IN") and display names ("Hindi"), case-insensitively,
 # to the canonical display name used to build the saved filename (e.g. "hindi.mp3").
@@ -345,6 +347,7 @@ def run_calls(campaign_id: str):
             mobiles = [b["mobile"] for b in batch]
             try:
                 result = sarv_client.trigger_voice_broadcast(group["audio_url"], mobiles, callback_url=callback_url)
+                logger.info("Sarv broadcast response for %s: %s", mobiles, result)
                 returned = result.get("data", [])
                 # Match by mobileNumber rather than position, in case Sarv
                 # drops/reorders invalid entries in the response.
@@ -553,9 +556,6 @@ def obd_campaign_performance(user: dict = Depends(require_permission("dashboard"
 # Sarv's vb-api v2 /broadcasting instead pushes updates to whatever
 # `callback_url` you passed on the original request - handled below.
 
-import logging
-logger = logging.getLogger("sarv_webhook")
-
 
 @router.post("/api/campaigns/webhooks/sarv-status")
 async def sarv_status_webhook(request: Request):
@@ -585,6 +585,11 @@ async def sarv_status_webhook(request: Request):
 
     new_status = sarv_client.map_sarv_status(status) if status else "completed"
     update = {"status": new_status}
+    # Store Sarv's raw status text as the reason, except when the call
+    # actually succeeded - otherwise the Excel report's "Error" column
+    # stays blank for no-answer/busy/failed calls, which was the bug.
+    if status and new_status != "completed":
+        update["error_message"] = f"Sarv status: {status}"
     if duration:
         try:
             update["call_duration"] = float(duration)
