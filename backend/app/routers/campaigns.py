@@ -22,7 +22,7 @@ router = APIRouter(tags=["obd-campaigns"])
 logger = logging.getLogger("sarv_webhook")
 
 # Maps both language codes ("hi-IN") and display names ("Hindi"), case-insensitively,
-# to the canonical display name used to build the saved filename (e.g. "hindi.mp3").
+# to the canonical display name used to build the saved filename (e.g. "hindi.wav").
 _LANGUAGE_LOOKUP = {}
 for _code, _name in LANGUAGE_DISPLAY.items():
     _LANGUAGE_LOOKUP[_code.lower()] = _name
@@ -47,7 +47,7 @@ def _resolve_language_audio(language_value: str | None, voice_folder_id: str | N
     if not matched_name:
         return None, f"File name mismatch with details — '{language_value}' is not a recognized language"
 
-    filename = f"{matched_name.lower()}.mp3"
+    filename = f"{matched_name.lower()}.wav"
     doc = tts_collection.find_one({"folder_id": voice_folder_id, "filename": filename}, {"_id": 1})
     if not doc:
         return None, f"File name mismatch with details — no saved recording found for '{matched_name}' in the selected voice folder ({filename})"
