@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
 from .. import groq_client
-from ..auth import require_any_permission, require_permission, owner_filter, assert_owns_or_admin
+from ..auth import require_any_permission, require_permission
 from ..constants import LANGUAGE_DISPLAY, LANGUAGE_NAMES, resolve_speaker
 from ..database import tts_collection, voice_folders_collection
 
@@ -20,13 +20,6 @@ def _oid(folder_id: str) -> ObjectId:
         return ObjectId(folder_id)
     except InvalidId:
         raise HTTPException(400, "Invalid folder id")
-
-
-def _folder_or_404(folder_id: str) -> dict:
-    folder = voice_folders_collection.find_one({"_id": _oid(folder_id)})
-    if not folder:
-        raise HTTPException(404, "Folder not found")
-    return folder
 
 
 # ---------------------------------------------------------------- schemas --
@@ -52,14 +45,14 @@ class GenerateRequest(BaseModel):
 def create_folder(payload: FolderCreate, user: dict = Depends(require_permission("voices", "create"))):
     """Creates a brand-new, named voice folder. A folder name is required
     every time - this is the mandatory first step before generating speech."""
-    doc = {"name": payload.name.strip(), "created_at": datetime.utcnow(), "created_by": user["uid"]}
+    doc = {"name": payload.name.strip(), "created_at": datetime.utcnow()}
     result = voice_folders_collection.insert_one(doc)
     return {"id": str(result.inserted_id), "name": doc["name"], "created_at": doc["created_at"]}
 
 
 @router.get("/folders")
 def list_folders(user: dict = Depends(require_any_permission(("tts", "view"), ("voices", "view")))):
-    docs = voice_folders_collection.find(owner_filter(user)).sort("created_at", -1)
+    docs = voice_folders_collection.find().sort("created_at", -1)
     folders = []
     for d in docs:
         folder_id = str(d["_id"])
@@ -77,7 +70,6 @@ def delete_folder(folder_id: str, user: dict = Depends(require_permission("voice
     folder = voice_folders_collection.find_one({"_id": oid})
     if not folder:
         raise HTTPException(404, "Folder not found")
-    assert_owns_or_admin(user, folder)
 
     tts_collection.delete_many({"folder_id": folder_id})
     voice_folders_collection.delete_one({"_id": oid})
@@ -158,7 +150,6 @@ async def generate_speech(payload: GenerateRequest, user: dict = Depends(require
     folder = voice_folders_collection.find_one({"_id": _oid(payload.folder_id)})
     if not folder:
         raise HTTPException(404, "Voice folder not found")
-    assert_owns_or_admin(user, folder)
     if not payload.text.strip():
         raise HTTPException(422, "Text is required")
 
@@ -224,17 +215,8 @@ def tts_history(folder_id: str | None = Query(default=None, description="Filter 
     Records from before folder-scoped voices existed have no folder_id and
     are skipped, since they can no longer be tied to any folder's directory.
     The raw audio_data binary is excluded from this list response - it's
-    fetched only on demand via the download endpoint.
-
-    A plain user only ever sees voices in folders THEY created; admin/super_admin see everyone's."""
-    if folder_id:
-        assert_owns_or_admin(user, _folder_or_404(folder_id))
-        query = {"folder_id": folder_id}
-    else:
-        query = {"folder_id": {"$exists": True, "$ne": None}}
-        if user["role"] not in ("super_admin", "admin"):
-            owned_folder_ids = [str(f["_id"]) for f in voice_folders_collection.find(owner_filter(user), {"_id": 1})]
-            query["folder_id"] = {"$in": owned_folder_ids}
+    fetched only on demand via the download endpoint."""
+    query = {"folder_id": folder_id} if folder_id else {"folder_id": {"$exists": True, "$ne": None}}
     docs = list(tts_collection.find(query, {"audio_data": 0}).sort("updated_at", -1))
     results = []
     for doc in docs:
@@ -251,12 +233,11 @@ def download_audio(folder_id: str, filename: str):
     """Streams the audio straight out of MongoDB in real time - nothing is
     ever read from local disk.
 
-    Deliberately NOT behind require_permission(): this is the same audio_url
-    Sarv's servers fetch directly during a live call (run_calls() in
-    campaigns.py builds URLs pointing here), and Sarv has no way to send our
-    app's login token. A folder_id + filename pair is effectively unguessable,
-    and the only way to ever learn a real one is through the already-protected
-    /folders and /history endpoints, so this stays private in practice."""
+    Intentionally NOT behind require_permission(): Sarv's servers fetch this
+    URL directly (as `audio_url`) while placing each call, and they can't
+    send a Firebase Authorization header. Guessing a valid folder_id +
+    filename pair is impractical (folder_id is a Mongo ObjectId), so this
+    stays reasonably safe while still being publicly fetchable."""
     doc = tts_collection.find_one({"folder_id": folder_id, "filename": filename})
     if not doc or not doc.get("audio_data"):
         raise HTTPException(404, "Audio not found")
@@ -271,7 +252,6 @@ def download_audio(folder_id: str, filename: str):
 def delete_voice(folder_id: str, language_code: str, user: dict = Depends(require_permission("tts", "delete"))):
     """Removes one generated language's DB record (audio included, since it
     lives inside that same document)."""
-    assert_owns_or_admin(user, _folder_or_404(folder_id))
     result = tts_collection.delete_one({"folder_id": folder_id, "language_code": language_code})
     if result.deleted_count == 0:
         raise HTTPException(404, "Voice not found")
