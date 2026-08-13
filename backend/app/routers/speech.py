@@ -1,10 +1,11 @@
 import os
+import re
 from datetime import datetime
 
 import httpx
 from bson import ObjectId, Binary
 from bson.errors import InvalidId
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
 from .. import groq_client
@@ -13,6 +14,46 @@ from ..constants import LANGUAGE_DISPLAY, LANGUAGE_NAMES, resolve_speaker
 from ..database import tts_collection, voice_folders_collection
 
 router = APIRouter(prefix="/api/tts", tags=["text-to-speech"])
+
+
+def _range_response(request: Request, data: bytes, media_type: str, filename: str) -> Response:
+    """Serves `data` with HTTP Range support. Many telephony/IVR audio
+    players (Sarv's included, likely Asterisk/FreeSWITCH-based under the
+    hood) fetch playback audio via byte-range requests to determine file
+    size and stream progressively - a plain 200-only response (which is all
+    browsers need) can cause those players to silently fail to play the
+    audio even though the file itself is perfectly valid. This mirrors what
+    a static file server does: honor Range when present, else serve the
+    whole thing with Accept-Ranges advertised so range-aware clients know
+    they can ask for a slice."""
+    total = len(data)
+    range_header = request.headers.get("range")
+    base_headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Disposition": f'inline; filename="{filename}"',
+    }
+
+    if range_header:
+        match = re.match(r"bytes=(\d*)-(\d*)", range_header)
+        if match:
+            start_str, end_str = match.groups()
+            start = int(start_str) if start_str else 0
+            end = int(end_str) if end_str else total - 1
+            end = min(end, total - 1)
+            if start <= end < total:
+                chunk = data[start : end + 1]
+                headers = {
+                    **base_headers,
+                    "Content-Range": f"bytes {start}-{end}/{total}",
+                    "Content-Length": str(len(chunk)),
+                }
+                return Response(content=chunk, status_code=206, media_type=media_type, headers=headers)
+
+    return Response(
+        content=data,
+        media_type=media_type,
+        headers={**base_headers, "Content-Length": str(total)},
+    )
 
 
 def _oid(folder_id: str) -> ObjectId:
@@ -243,7 +284,7 @@ def tts_history(folder_id: str | None = Query(default=None, description="Filter 
 
 
 @router.get("/download/{folder_id}/{filename}")
-def download_audio(folder_id: str, filename: str):
+def download_audio(folder_id: str, filename: str, request: Request):
     """Streams the audio straight out of MongoDB in real time - nothing is
     ever read from local disk.
 
@@ -255,11 +296,7 @@ def download_audio(folder_id: str, filename: str):
     doc = tts_collection.find_one({"folder_id": folder_id, "filename": filename})
     if not doc or not doc.get("audio_data"):
         raise HTTPException(404, "Audio not found")
-    return Response(
-        content=bytes(doc["audio_data"]),
-        media_type="audio/wav",
-        headers={"Content-Disposition": f'inline; filename="{filename}"'},
-    )
+    return _range_response(request, bytes(doc["audio_data"]), "audio/wav", filename)
 
 
 @router.delete("/{folder_id}/{language_code}")
