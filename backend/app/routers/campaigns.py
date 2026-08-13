@@ -17,6 +17,7 @@ from ..auth import require_permission
 from ..database import campaigns_collection, contacts_collection, call_logs_collection, voice_folders_collection, tts_collection
 from ..constants import LANGUAGE_DISPLAY
 from .. import sarv_client
+from .speech import _range_response
 
 router = APIRouter(tags=["obd-campaigns"])
 logger = logging.getLogger("sarv_webhook")
@@ -123,7 +124,7 @@ def set_voice_source(campaign_id: str, payload: VoiceSourceUpdate, user: dict = 
 
 
 @router.get("/api/campaigns/{campaign_id}/audio")
-def get_campaign_audio(campaign_id: str):
+def get_campaign_audio(campaign_id: str, request: Request):
     """Streams this campaign's default audio straight out of MongoDB in real
     time - nothing is ever read from local disk. Used both by Sarv's voice
     broadcast (fetches `audio_url` while placing each call) and for in-app
@@ -139,11 +140,13 @@ def get_campaign_audio(campaign_id: str):
     campaign = campaigns_collection.find_one({"_id": oid}, {"audio_data": 1, "audio_content_type": 1, "audio_filename": 1})
     if not campaign or not campaign.get("audio_data"):
         raise HTTPException(404, "No default audio uploaded for this campaign")
-    return Response(
-        content=bytes(campaign["audio_data"]),
-        media_type=campaign.get("audio_content_type", "audio/mpeg"),
-        headers={"Content-Disposition": f'inline; filename="{campaign.get("audio_filename", "campaign_audio")}"'},
-    )
+    filename = campaign.get("audio_filename", "campaign_audio")
+    # This serves whatever the admin actually uploaded via upload-audio (could
+    # be mp3, wav, anything) - unrelated to the TTS-generated Hindi/etc audio,
+    # so the fallback stays audio/mpeg (matching upload_audio's own default)
+    # rather than assuming wav.
+    media_type = campaign.get("audio_content_type", "audio/mpeg")
+    return _range_response(request, bytes(campaign["audio_data"]), media_type, filename)
 
 
 @router.post("/api/campaigns/{campaign_id}/upload-audio")
