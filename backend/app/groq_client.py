@@ -80,10 +80,16 @@ async def _call_groq(prompt: str, system_instruction: str) -> str:
         raise HTTPException(502, "Groq returned no usable text")
 
 
-async def translate_text(text: str, source_lang_name: str, target_lang_name: str, gender: str) -> str:
+async def translate_text(text: str, source_lang_name: str, target_lang_name: str, gender: str, strict_native_script: bool = False) -> str:
     """Translates `text` from source_lang_name into target_lang_name, phrased
     for a {gender} speaker (pronouns / verb conjugations should agree with
     that gender wherever the target language grammatically distinguishes it).
+
+    strict_native_script=True adds a hard rule that forbids leaving ANY
+    English word untranslated (no Hinglish / code-switching) - use this for
+    Hindi (and other Devanagari/native-script) targets where the caller
+    wants a pure Hindi voice script, not the mixed English-Hindi phrasing
+    Groq sometimes defaults to for common English loanwords.
     """
     speaker_gender = "male" if gender == "male" else "female"
     system_instruction = (
@@ -103,6 +109,16 @@ async def translate_text(text: str, source_lang_name: str, target_lang_name: str
         "Output ONLY the translated text in the target language's native script - no explanations, "
         "no quotes, no markdown, no transliteration, no notes."
     )
+    if strict_native_script:
+        system_instruction += (
+            " STRICT RULE: do not leave ANY English word untranslated and do not code-switch "
+            f"(no Hinglish / no Latin-script words mixed into the {target_lang_name} output). Every "
+            f"common English word or phrase (e.g. 'offer', 'discount', 'order', 'delivery', 'update') "
+            f"must be rendered in its proper {target_lang_name} equivalent, written in the target "
+            "language's native script. The ONLY exceptions are things with no real translation - "
+            "brand names, product names, and proper nouns - and even those must be spelled out "
+            "phonetically in the target script, not left in Latin letters."
+        )
 
     translated_parts = []
     for chunk in _split_text(text):
