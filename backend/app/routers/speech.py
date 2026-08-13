@@ -124,7 +124,7 @@ async def _generate_audio_bytes(text: str, language_code: str, speaker: str, pac
                     "model": "bulbul:v3",
                     "pace": pace,
                     "temperature": temperature,
-                    "speech_sample_rate": 24000,
+                    "speech_sample_rate": 8000,
                     "output_audio_codec": "mp3",
                     "output_audio_bitrate": "128k",
                     "enable_preprocessing": True,
