@@ -132,9 +132,12 @@ def map_sarv_status(status: Optional[str]) -> str:
     just means Sarv *accepted and dispatched* the call, not that it was
     answered - so it maps to "initiated". "Answered" (confirmed via a real
     test call, on the sarv-status *callback*) means the call was actually
-    picked up and the recording played, so it maps to "completed". Extend
-    this once you've seen the other status strings Sarv actually returns
-    for busy/no-answer/failed numbers."""
+    picked up and the recording played, so it maps to "completed".
+    "Not Answered" (confirmed via real test calls on the callback) means the
+    phone rang but nobody picked up - a normal outcome, not a system
+    failure - so it maps to "no-answer", not "failed". "Busy" maps to
+    "busy". Extend this further once you've seen other status strings Sarv
+    returns (e.g. switched off, invalid number, rejected)."""
     if not status:
         return "failed"
     s = status.strip().lower()
@@ -142,6 +145,10 @@ def map_sarv_status(status: Optional[str]) -> str:
         return "initiated"
     if s in ("answered", "completed"):
         return "completed"
+    if s in ("not answered", "no answer", "noanswer", "no-answer"):
+        return "no-answer"
+    if s == "busy":
+        return "busy"
     if s in ("failed", "invalid"):
         return "failed"
     return "failed"
