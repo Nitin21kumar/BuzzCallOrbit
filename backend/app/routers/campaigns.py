@@ -575,7 +575,10 @@ async def sarv_status_webhook(request: Request):
 
     unique_id = payload.get("uniqueId") or payload.get("unique_id")
     status = payload.get("status")
-    duration = payload.get("duration") or payload.get("call_duration")
+    # Confirmed via real test calls: Sarv's callback field is
+    # `answer_duration`, not `duration` / `call_duration` - keep those as
+    # fallbacks in case other event types use different field names.
+    duration = payload.get("answer_duration") or payload.get("duration") or payload.get("call_duration")
 
     if not unique_id:
         return {"ok": False, "reason": "no uniqueId in payload - check server logs for the raw body"}
